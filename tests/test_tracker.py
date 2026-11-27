@@ -1172,6 +1172,11 @@ database:
             self.assertIn("Amazon Depo Özel Radarı", html_out)
             self.assertIn("JBL GO4 Bluetooth Hoparlör", html_out)
             self.assertIn("-%80", html_out)
+            self.assertIn("gp/aws/cart/add.html?ASIN.1=B0CZDCWM48", html_out)
+            # Tükenen ürün (yeni taramada olmayan ASIN) otomatik silinmeli
+            removed = st.prune_stale_depo_deals({"B0NEWASIN1"})
+            self.assertEqual(removed, 1)
+            self.assertEqual(len(st.list_depo_deals()), 0)
 
 
 if __name__ == "__main__":

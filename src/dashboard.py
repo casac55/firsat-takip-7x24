@@ -427,6 +427,12 @@ def start_dashboard_server(
                     self._send_json(200, {"ok": True, "msg": f"{cnt} Amazon Depo kaydı temizlendi."})
                     return
 
+                if path == "/api/depo/delete":
+                    asin = str(data.get("asin", "")).strip().upper()
+                    ok = storage.delete_depo_deal(asin)
+                    self._send_json(200, {"ok": ok, "msg": "Ürün panelden kaldırıldı." if ok else "Bulunamadı."})
+                    return
+
                 if path == "/api/summary/send-now":
                     if notifier is None or not notifier.is_configured:
                         self._send_json(400, {"ok": False, "msg": "Telegram ayarlı değil."})
@@ -1634,6 +1640,7 @@ def _render_dashboard_html(
             else ""
         )
         asin_js = json.dumps(asin_s)
+        cart_url = f"https://www.amazon.com.tr/gp/aws/cart/add.html?ASIN.1={asin_s}&Quantity.1=1"
         depo_cards_html.append(
             f"<div class='offer-row depo-item' data-pct='{dpct}' style='align-items:flex-start'>"
             f"<div style='display:flex;gap:10px;align-items:flex-start;flex:1;min-width:0'>"
@@ -1648,8 +1655,10 @@ def _render_dashboard_html(
             f"<span class='muted'>({format_tl(sav)} kazanç • {html.escape(str(dd.get('price_source') or 'Piyasa'))})</span>"
             f"</div></div>"
             f"<div class='actions'>"
-            f"<a class='btn-go' href='{html.escape(str(dd.get('url') or '#'), quote=True)}' target='_blank'>🛒 Depo'da Aç</a>"
+            f"<a class='btn-sm btn-green' href='{html.escape(cart_url, quote=True)}' target='_blank'>⚡ Sepete Ekle</a>"
+            f"<a class='btn-go' href='{html.escape(str(dd.get('url') or '#'), quote=True)}' target='_blank'>🛒 Depo</a>"
             f"<button class='btn-sm btn-purple' onclick='publishDepo({asin_js})'>📢 Kanala At</button>"
+            f"<button class='btn-sm btn-red' title='Tükendiyse kaldır' onclick='deleteDepo({asin_js})'>🗑</button>"
             f"</div></div>"
         )
 
@@ -2355,6 +2364,10 @@ sudo apt-get update && sudo apt-get install -y unzip && mkdir -p ~/firsat-takip 
 
     function publishDepo(asin) {{
       api('/api/depo/publish', {{asin}}, false);
+    }}
+
+    function deleteDepo(asin) {{
+      api('/api/depo/delete', {{asin}});
     }}
 
     function filterDepo(minPct) {{

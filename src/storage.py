@@ -983,6 +983,23 @@ class PriceStorage:
                 (float(price_tl), asin.strip().upper()),
             )
 
+    def prune_stale_depo_deals(self, active_asins: set[str]) -> int:
+        """Son canlı Depo taramasında artık stokta görünmeyen (tükenen) ürünleri panelden kaldırır."""
+        with self._connect() as conn:
+            if not active_asins:
+                return 0
+            placeholders = ",".join("?" for _ in active_asins)
+            cur = conn.execute(
+                f"DELETE FROM amazon_depo_deals WHERE asin NOT IN ({placeholders})",
+                tuple(active_asins),
+            )
+            return int(cur.rowcount or 0)
+
+    def delete_depo_deal(self, asin: str) -> bool:
+        with self._connect() as conn:
+            cur = conn.execute("DELETE FROM amazon_depo_deals WHERE asin = ?", (asin.strip().upper(),))
+            return cur.rowcount > 0
+
     def clear_depo_deals(self) -> int:
         with self._connect() as conn:
             cur = conn.execute("DELETE FROM amazon_depo_deals")

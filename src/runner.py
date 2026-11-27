@@ -499,9 +499,11 @@ class PriceTrackerRunner:
             )
             if deals:
                 self.storage.upsert_depo_deals(deals)
+                removed = self.storage.prune_stale_depo_deals({d.asin for d in deals})
                 logger.info(
-                    "[Amazon Depo] %d fırsat bulundu (en yüksek indirim: -%%%d).",
+                    "[Amazon Depo] %d aktif fırsat güncellendi, %d tükenen ürün panelden kaldırıldı (en yüksek: -%%%d).",
                     len(deals),
+                    removed,
                     deals[0].discount_percent,
                 )
 
@@ -514,16 +516,22 @@ class PriceTrackerRunner:
                 if self.config.depo_auto_notify_admin and self.notifier.is_configured:
                     import html as _html
 
+                    cart_url = f"https://www.amazon.com.tr/gp/aws/cart/add.html?ASIN.1={d.asin}&Quantity.1=1"
                     msg = (
                         f"🚨📦 <b>AMAZON DEPO EFSANE DÜŞÜŞ! (-%{d.discount_percent})</b>\n\n"
                         f"📦 <b>{_html.escape(d.title)}</b>\n"
                         f"💰 Depo Fiyatı: <b>{format_tl(d.depo_price_tl)}</b>\n"
                         f"📊 Piyasa Fiyatı: <s>{format_tl(d.market_price_tl)}</s> ({_html.escape(d.price_source)})\n"
                         f"🔥 Kazanç: <b>{format_tl(d.savings_tl)} (-%{d.discount_percent})</b>\n"
-                        f"🏷 Durum: <i>{_html.escape(d.condition_label)}</i>\n\n"
-                        f'🛒 <a href="{_html.escape(d.url, quote=True)}">HEMEN AMAZON DEPO\'DA AÇ</a>'
+                        f"🏷 Durum: <i>{_html.escape(d.condition_label)}</i>"
                     )
-                    self.notifier.send_html(msg)
+                    kb = {
+                        "inline_keyboard": [
+                            [{"text": "⚡ 1 Tıkla Sepete Ekle (Amazon)", "url": cart_url}],
+                            [{"text": "🛒 Amazon Depo Sayfasını Aç", "url": d.url}],
+                        ]
+                    }
+                    self.notifier.send_html(msg, reply_markup=kb)
                     self.storage.mark_depo_asin_notified(d.asin, d.depo_price_tl)
 
                 if self.config.depo_auto_publish_channel and self.channel_publisher.is_enabled:
