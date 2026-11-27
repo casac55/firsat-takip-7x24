@@ -948,13 +948,16 @@ def _render_dashboard_html(
       <div class="card">
         <div class="card-head">
           <h2>⚡ Doğrudan Ödeme Ekranına Geçiş (Sepete Ekle → Alışverişi Tamamla)</h2>
-          <a class="btn btn-orange btn-sm" href="/amazon-depo-fast.user.js" target="_blank">⬇️ Hızlı Geçiş Betiğini Yükle (.user.js)</a>
+          <div class="actions">
+            <button class="btn btn-orange btn-sm" onclick="copyUserscript()">📋 Betik Kodunu Kopyala</button>
+            <a class="btn btn-dark btn-sm" href="/amazon-depo-fast.user.js" target="_blank">⬇️ .user.js</a>
+          </div>
         </div>
         <p class="muted" style="line-height:1.5">
           Amazon hesabınızın şifresini paylaşmadan, kendi açık tarayıcınızda <b>"Sepete Ekle → Alışverişi Tamamla"</b> adımlarını otomatik geçip sizi doğrudan <b>Ödeme Ekranına</b> ulaştırır (son satın alma onayına asla basmaz):
-          <br/>• <b>Bilgisayar (Chrome/Edge):</b> <b>Tampermonkey</b> eklentisini kurup yukarıdaki turuncu butona tıklayın ve "Kur" deyin.
-          <br/>• <b>iPhone (Safari):</b> App Store'dan ücretsiz <b>Userscripts</b> uygulamasını açıp betiği ekleyin.
-          <br/>• Kurulumdan sonra panelden veya Telegram'dan <b>⚡ Depo Teklifini Aç &amp; Al</b> linkine bastığınızda otomatik olarak ödeme ekranına geçersiniz!
+          <br/>1. <b>📋 Betik Kodunu Kopyala</b> butonuna basın.
+          <br/>2. Chrome sağ üstte <b>Tampermonkey → Yeni betik oluştur...</b> açın, içindekini silip (<code>Ctrl+A</code> → <code>Delete</code>) yapıştırın (<code>Ctrl+V</code>) ve kaydedin (<code>Ctrl+S</code>).
+          <br/>3. <i>(iPhone Safari'de ücretsiz <b>Userscripts</b> uygulamasına yapıştırıp Save deyin.)</i>
         </p>
       </div>
     </div>
@@ -1138,6 +1141,17 @@ def _render_dashboard_html(
         amazon_tag: val('in_tag'),
         dashboard_password: val('in_pwd')
       }});
+    }}
+
+    async function copyUserscript() {{
+      try {{
+        const r = await fetch('/amazon-depo-fast.user.js');
+        const txt = await r.text();
+        await navigator.clipboard.writeText(txt);
+        toast('✅ Betik kodu panoya kopyalandı! Şimdi Tampermonkey -> Yeni betik oluştur -> Ctrl+A -> Ctrl+V -> Ctrl+S yapın.', true);
+      }} catch (e) {{
+        toast('Kopyalama hatası: ' + e, false);
+      }}
     }}
 
     async function loadLogs() {{
