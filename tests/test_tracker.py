@@ -1141,29 +1141,48 @@ database:
                 if "warehouse-deals" in url:
                     return (
                         '<div data-component-type="s-search-result" data-asin="B0CZDCWM48">'
-                        '<h2>JBL GO4 Bluetooth Hoparlör Su Geçirmez</h2>'
+                        "<h2>JBL GO4 Bluetooth Hoparlör Su Geçirmez</h2>"
                         '<img class="s-image" src="https://m.media-amazon.com/images/I/jblgo4.jpg"/>'
                         '<div data-cy="secondary-offer-recipe">Diğer satın alma seçenekleri 499,00 TL (1 İkinci El ürün)</div>'
                         "</div>"
                     )
-                if "hepsiburada.com/ara" in url:
+                if "aodAjaxMain" in url:
                     return (
-                        '<script type="application/ld+json">'
-                        '{"@type":"Product","name":"JBL GO4 Bluetooth Hoparlör","offers":{"price":"2499.00"}}'
-                        "</script>"
+                        '<span id="aod-asin-title-text">JBL GO4 Bluetooth Hoparlör Su Geçirmez</span>'
+                        '<img id="aod-asin-image-id" src="https://m.media-amazon.com/images/I/jblgo4.jpg"/>'
+                        '<div id="aod-offer">'
+                        '<span class="a-price-whole">2.499,</span><span class="a-price-fraction">00</span>'
+                        '<div id="aod-offer-heading">Yeni</div><div id="aod-offer-soldBy">Satıcı Amazon.com.tr</div>'
+                        "</div>"
+                        '<div id="aod-offer">'
+                        '<span class="a-price-whole">499,</span><span class="a-price-fraction">00</span>'
+                        '<div id="aod-offer-heading">İkinci El - Yeni Gibi</div>'
+                        '<div id="aod-offer-soldBy">Satıcı Amazon Depo</div>'
+                        "<span data-aod-atc-action='{\"oid\":\"YS9ssVumaFVfEncryptedDepoOID123==\"}'></span>"
+                        "</div>"
                     )
                 return ""
 
         hunter = AmazonDepoHunter(_FakeDepoFetcher())  # type: ignore[arg-type]
-        deals = hunter.hunt(categories=["tumu"], min_discount_percent=40, super_discount_percent=75)
+        deals, sold_out = hunter.hunt(
+            categories=["tumu"],
+            scan_popular_pool=False,
+            min_discount_percent=40,
+            super_discount_percent=75,
+        )
         self.assertEqual(len(deals), 1)
+        self.assertEqual(sold_out, set())
         self.assertEqual(deals[0].asin, "B0CZDCWM48")
         self.assertEqual(deals[0].discount_percent, 80)
+        self.assertEqual(deals[0].offer_listing_id, "YS9ssVumaFVfEncryptedDepoOID123==")
         self.assertTrue(deals[0].is_super_steal)
         self.assertIn("smid=A215JX4S9CANSO", deals[0].url)
+        self.assertIn("OfferListingId.1=YS9ssVumaFVfEncryptedDepoOID123", deals[0].cart_url())
 
         with tempfile.TemporaryDirectory() as tmp:
             st = PriceStorage(Path(tmp) / "depo.db")
+            st.add_depo_watchlist("B0D92CF1P5", note="Karcher K4", min_discount_percent=30)
+            self.assertEqual(len(st.list_depo_watchlist()), 1)
             st.upsert_depo_deals(deals)
             saved = st.list_depo_deals(min_discount=75)
             self.assertEqual(len(saved), 1)
@@ -1172,8 +1191,7 @@ database:
             self.assertIn("Amazon Depo Özel Radarı", html_out)
             self.assertIn("JBL GO4 Bluetooth Hoparlör", html_out)
             self.assertIn("-%80", html_out)
-            self.assertIn("gp/aws/cart/add.html?ASIN.1=B0CZDCWM48", html_out)
-            # Tükenen ürün (yeni taramada olmayan ASIN) otomatik silinmeli
+            self.assertIn("OfferListingId.1=YS9ssVumaFVfEncryptedDepoOID123", html_out)
             removed = st.prune_stale_depo_deals({"B0NEWASIN1"})
             self.assertEqual(removed, 1)
             self.assertEqual(len(st.list_depo_deals()), 0)

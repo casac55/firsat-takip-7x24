@@ -193,6 +193,8 @@ class PriceStorage:
                     discount_percent INTEGER NOT NULL,
                     savings_tl REAL NOT NULL,
                     condition_label TEXT DEFAULT '',
+                    condition_note TEXT DEFAULT '',
+                    offer_listing_id TEXT DEFAULT '',
                     category TEXT DEFAULT '',
                     url TEXT NOT NULL,
                     image_url TEXT DEFAULT '',
@@ -200,6 +202,16 @@ class PriceStorage:
                     is_super_steal INTEGER NOT NULL DEFAULT 0,
                     notified_price_tl REAL DEFAULT 0,
                     found_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS depo_watchlist (
+                    asin TEXT PRIMARY KEY,
+                    note TEXT DEFAULT '',
+                    target_price_tl REAL DEFAULT 0,
+                    min_discount_percent INTEGER DEFAULT 20,
+                    last_depo_price_tl REAL DEFAULT 0,
+                    in_depo_stock INTEGER DEFAULT 0,
+                    added_at TEXT NOT NULL
                 );
                 """
             )
@@ -215,6 +227,8 @@ class PriceStorage:
                 ("watched_url_history", "effective_price_tl", "REAL"),
                 ("watched_url_history", "coupon_info", "TEXT DEFAULT ''"),
                 ("watched_url_history", "coupon_code", "TEXT DEFAULT ''"),
+                ("amazon_depo_deals", "condition_note", "TEXT DEFAULT ''"),
+                ("amazon_depo_deals", "offer_listing_id", "TEXT DEFAULT ''"),
             ):
                 cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({tbl})").fetchall()}
                 if col not in cols:
@@ -910,8 +924,9 @@ class PriceStorage:
                     """
                     INSERT INTO amazon_depo_deals
                         (asin, title, depo_price_tl, market_price_tl, discount_percent, savings_tl,
-                         condition_label, category, url, image_url, price_source, is_super_steal, found_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         condition_label, condition_note, offer_listing_id, category, url, image_url,
+                         price_source, is_super_steal, found_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(asin) DO UPDATE SET
                         title = excluded.title,
                         depo_price_tl = excluded.depo_price_tl,
@@ -919,6 +934,8 @@ class PriceStorage:
                         discount_percent = excluded.discount_percent,
                         savings_tl = excluded.savings_tl,
                         condition_label = excluded.condition_label,
+                        condition_note = excluded.condition_note,
+                        offer_listing_id = excluded.offer_listing_id,
                         category = excluded.category,
                         url = excluded.url,
                         image_url = CASE WHEN excluded.image_url != '' THEN excluded.image_url ELSE amazon_depo_deals.image_url END,
@@ -934,6 +951,8 @@ class PriceStorage:
                         int(d.discount_percent),
                         float(d.savings_tl),
                         d.condition_label,
+                        getattr(d, "condition_note", ""),
+                        getattr(d, "offer_listing_id", ""),
                         d.category,
                         d.url,
                         d.image_url,
@@ -943,6 +962,57 @@ class PriceStorage:
                     ),
                 )
         return len(deals)
+
+    def remove_depo_asins(self, asins: set[str]) -> int:
+        if not asins:
+            return 0
+        with self._connect() as conn:
+            placeholders = ",".join("?" for _ in asins)
+            cur = conn.execute(
+                f"DELETE FROM amazon_depo_deals WHERE asin IN ({placeholders})",
+                tuple(a.strip().upper() for a in asins),
+            )
+            return int(cur.rowcount or 0)
+
+    def add_depo_watchlist(
+        self, asin: str, note: str = "", target_price_tl: float = 0.0, min_discount_percent: int = 20
+    ) -> None:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO depo_watchlist (asin, note, target_price_tl, min_discount_percent, added_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(asin) DO UPDATE SET
+                    note = CASE WHEN excluded.note != '' THEN excluded.note ELSE depo_watchlist.note END,
+                    target_price_tl = excluded.target_price_tl,
+                    min_discount_percent = excluded.min_discount_percent
+                """,
+                (asin.strip().upper(), note.strip(), float(target_price_tl or 0.0), int(min_discount_percent), now),
+            )
+
+    def list_depo_watchlist(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM depo_watchlist ORDER BY added_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    def update_depo_watchlist_status(self, asin: str, price_tl: float, in_stock: bool, note: str = "") -> None:
+        with self._connect() as conn:
+            if note:
+                conn.execute(
+                    "UPDATE depo_watchlist SET last_depo_price_tl = ?, in_depo_stock = ?, note = ? WHERE asin = ?",
+                    (float(price_tl), 1 if in_stock else 0, note[:120], asin.strip().upper()),
+                )
+            else:
+                conn.execute(
+                    "UPDATE depo_watchlist SET last_depo_price_tl = ?, in_depo_stock = ? WHERE asin = ?",
+                    (float(price_tl), 1 if in_stock else 0, asin.strip().upper()),
+                )
+
+    def remove_depo_watchlist(self, asin: str) -> bool:
+        with self._connect() as conn:
+            cur = conn.execute("DELETE FROM depo_watchlist WHERE asin = ?", (asin.strip().upper(),))
+            return cur.rowcount > 0
 
     def list_depo_deals(self, min_discount: int = 0, limit: int = 60) -> list[dict]:
         with self._connect() as conn:
