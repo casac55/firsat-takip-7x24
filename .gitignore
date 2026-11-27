@@ -1,0 +1,28 @@
+# Gizli anahtarlar ve kişisel bilgiler (ASLA GitHub'a yüklenmez)
+.env
+*.key
+*.pem
+
+# Yerel veritabanı, kilit dosyaları ve loglar
+data/
+logs/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Python sanal ortam ve önbellek
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Geçici paketler ve IDE dosyaları
+*.zip
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

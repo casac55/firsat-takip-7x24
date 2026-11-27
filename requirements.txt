@@ -1,0 +1,11 @@
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+curl-cffi>=0.7.0
+pillow>=10.0.0
+tweepy>=4.14.0
+pytest>=8.0.0
+# Opsiyonel (JS korumalı siteler için tarayıcı fallback):
+# playwright>=1.45.0

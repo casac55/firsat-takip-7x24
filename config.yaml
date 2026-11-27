@@ -1,0 +1,95 @@
+product:
+  name: Samsung Galaxy S25 Ultra
+  variants:
+  - 256 GB
+  - 512 GB
+  - 1 TB
+  min_valid_price_tl: 45000
+  max_valid_price_tl: 160000
+  exclude_refurbished: true
+schedule:
+  interval_minutes: 3
+  turbo_interval_minutes: 2
+  turbo_windows:
+  - 09:00-10:30
+  - 12:00-14:00
+  - 17:30-22:30
+  - 23:45-01:30
+  daily_summary_times:
+  - 09:00
+  - '18:00'
+  notify_every_check: false
+alerts:
+  target_prices_tl:
+    256 GB: 62000
+    512 GB: 65000
+    1 TB: 83000
+  min_drop_tl: 500
+  min_drop_percent: 1.5
+  below_market_percent: 5.0
+  six_month_days: 180
+  six_month_baseline_tl:
+    256 GB: 0
+    512 GB: 0
+    1 TB: 0
+  wakeup_alarm:
+    enabled: true
+    active_window: 00:00-23:59
+    repeat_count: 1
+    repeat_interval_seconds: 12
+    pc_beep: true
+    auto_open_browser: true
+  cooldown_hours: 12
+dashboard:
+  enabled: true
+  host: 0.0.0.0
+  port: 8050
+channel:
+  enabled: true
+  channel_id: '@firsat_takibi'
+  channel_url: https://t.me/firsat_takibi
+  auto_publish_s25_deals: true
+  auto_publish_popular_deals: true
+  auto_publish_community_deals: true
+  auto_publish_bestseller_drops: true
+  max_popular_posts_per_scan: 4
+  min_discount_percent: 25
+  min_savings_tl: 100
+  always_show_ad_disclosure: true
+  show_disclosure_when_affiliate_active: true
+affiliate:
+  utm_source: telegram
+  utm_medium: firsat_takibi
+x_twitter:
+  auto_publish_deals: false
+  max_tweets_per_day: 10
+  min_discount_percent: 25
+  min_interval_minutes: 45
+bestseller_tracker:
+  enabled: true
+  compare_window_days: 30
+  min_drop_percent: 25.0
+  min_drop_tl: 100
+scraping:
+  timeout_seconds: 20
+  max_workers: 5
+  use_curl_cffi: true
+  use_playwright_fallback: false
+  sources:
+    epey: true
+    akakce: true
+    cimri: true
+    amazon_tr: true
+    hepsiburada: true
+    trendyol: true
+    vatan: true
+    teknosa: true
+    mediamarkt: true
+    samsung_tr: true
+    n11: true
+    pazarama: true
+telegram:
+  enable_bot_commands: true
+  top_offers_per_variant: 5
+database:
+  path: data/prices.db
