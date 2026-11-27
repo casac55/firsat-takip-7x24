@@ -119,15 +119,6 @@ def start_dashboard_server(
             parsed = urlparse(self.path)
             qs = parse_qs(parsed.query)
 
-            if not self._is_authenticated():
-                login_bytes = _render_login_html(config).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(login_bytes)))
-                self.end_headers()
-                self.wfile.write(login_bytes)
-                return
-
             if parsed.path == "/amazon-depo-fast.user.js":
                 js_bytes = _build_amazon_depo_userscript().encode("utf-8")
                 self.send_response(200)
@@ -136,6 +127,15 @@ def start_dashboard_server(
                 self.send_header("Content-Length", str(len(js_bytes)))
                 self.end_headers()
                 self.wfile.write(js_bytes)
+                return
+
+            if not self._is_authenticated():
+                login_bytes = _render_login_html(config).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(login_bytes)))
+                self.end_headers()
+                self.wfile.write(login_bytes)
                 return
 
             if parsed.path == "/export.csv":
