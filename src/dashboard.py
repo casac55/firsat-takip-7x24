@@ -516,8 +516,8 @@ def _build_amazon_depo_userscript() -> str:
     return """// ==UserScript==
 // @name         Amazon.com.tr Depo Hizli Odeme Gecisi
 // @namespace    amazon-depo-sniper
-// @version      1.0
-// @description  #ft_buy=1 ile acilan Amazon Depo urununu sepete ekler ve Alisverisi Tamamla'ya tiklayip odeme ekraninda durur.
+// @version      1.1
+// @description  ft_buy=1 ile acilan Amazon Depo urununu sepete ekler ve Alisverisi Tamamla'ya tiklayip odeme ekraninda durur.
 // @match        https://www.amazon.com.tr/*
 // @grant        none
 // ==/UserScript==
@@ -525,7 +525,7 @@ def _build_amazon_depo_userscript() -> str:
 (function () {
   'use strict';
 
-  if (location.hash.includes('ft_buy=1')) {
+  if (location.search.includes('ft_buy=1') || location.hash.includes('ft_buy=1')) {
     sessionStorage.setItem('ft_buy_active', '1');
     sessionStorage.setItem('ft_buy_ts', String(Date.now()));
   }
@@ -547,9 +547,9 @@ def _build_amazon_depo_userscript() -> str:
   const timer = setInterval(() => {
     if (stepDone) return;
 
-    // 1) Sepet / SmartWagon ekranindaysak -> Alisverisi Tamamla butonuna bas
+    // 1) Sepet / SmartWagon / SideSheet ekranindaysak -> Alisverisi Tamamla butonuna bas
     const ptc = document.querySelector(
-      'input[name="proceedToRetailCheckout"], #sc-buy-box-ptc-button input, #attach-sidesheet-checkout-button input, [data-feature-id="proceed-to-checkout-action"]'
+      'input[name="proceedToRetailCheckout"], #sc-buy-box-ptc-button input, #attach-sidesheet-checkout-button input, #aod-atc-checkout-btn input, [data-feature-id="proceed-to-checkout-action"]'
     );
     if (ptc && ptc.offsetParent !== null) {
       stepDone = true;
@@ -558,14 +558,17 @@ def _build_amazon_depo_userscript() -> str:
       return;
     }
 
-    // 2) AOD cekmecesi aciksa -> "Amazon Depo" saticisinin Sepete Ekle butonuna bas
+    // 2) AOD cekmecesi aciksa -> Sabitlenmis (pinned) veya liste icindeki Depo / Ikinci El teklifinin Sepete Ekle butonuna bas
     const offers = document.querySelectorAll('#aod-pinned-offer, #aod-offer');
+    const fromDepoUrl = location.search.includes('A215JX4S9CANSO');
     for (const off of offers) {
+      const txt = (off.textContent || '').toLowerCase();
       const soldEl = off.querySelector('#aod-offer-soldBy');
       const soldTxt = (soldEl ? soldEl.textContent : '').toLowerCase();
-      if (soldTxt.includes('amazon depo')) {
-        const atc = off.querySelector('[data-aod-atc-action] input[type="submit"], [data-aod-atc-action] button, input[name="submit.addToCart"], .aod-atc-btn input');
-        if (atc) {
+      const isDepoMatch = soldTxt.includes('amazon depo') || (fromDepoUrl && (txt.includes('ikinci el') || txt.includes('yeni gibi') || txt.includes('çok iyi') || txt.includes('kabul edilebilir')));
+      if (isDepoMatch) {
+        const atc = off.querySelector('[data-aod-atc-action] input[type="submit"], [data-aod-atc-action] button, input[name="submit.addToCart"], .aod-atc-btn input, input.a-button-input[type="submit"]');
+        if (atc && atc.offsetParent !== null) {
           stepDone = true;
           setTimeout(() => { stepDone = false; }, 2200);
           atc.click();
@@ -574,7 +577,16 @@ def _build_amazon_depo_userscript() -> str:
       }
     }
 
-    // 3) Ana sayfa BuyBox zaten Amazon Depo ise -> direkt Sepete Ekle
+    // 3) AOD sepete eklendikten sonra "Sepete Git" butonu cikarsa tikla (oradan Alisverisi Tamamla'ya gecer)
+    const goCart = document.querySelector('#sw-gtc a, #attach-sidesheet-view-cart-button input, a[href*="/gp/cart/view.html"], a[href*="/cart?ref"]');
+    if (goCart && goCart.offsetParent !== null && document.body.textContent.toLowerCase().includes('sepete eklendi')) {
+      stepDone = true;
+      setTimeout(() => { stepDone = false; }, 2200);
+      goCart.click();
+      return;
+    }
+
+    // 4) Ana sayfa BuyBox zaten Amazon Depo ise -> direkt Sepete Ekle
     const merchEl = document.querySelector('#merchant-info, #sellerProfileTriggerId');
     const merchTxt = (merchEl ? merchEl.textContent : '').toLowerCase();
     if (merchTxt.includes('amazon depo')) {
@@ -585,7 +597,7 @@ def _build_amazon_depo_userscript() -> str:
         mainAtc.click();
       }
     }
-  }, 350);
+  }, 300);
 })();
 """
 

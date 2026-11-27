@@ -66,7 +66,7 @@ def build_depo_cart_url(asin: str, offer_listing_id: str = "", associate_tag: st
     açan kesin bağlantıyı kullanır.
     """
     tag_dp = f"&tag={quote(associate_tag)}" if associate_tag else ""
-    return f"https://www.amazon.com.tr/dp/{asin}?aod=1&smid={AMAZON_DEPO_MERCHANT_ID}&th=1{tag_dp}#ft_buy=1"
+    return f"https://www.amazon.com.tr/dp/{asin}?aod=1&smid={AMAZON_DEPO_MERCHANT_ID}&th=1&ft_buy=1{tag_dp}#ft_buy=1"
 
 
 @dataclass(slots=True)
