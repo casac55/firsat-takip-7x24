@@ -1160,7 +1160,7 @@ database:
         self.assertEqual(deals[0].asin, "B0CZDCWM48")
         self.assertEqual(deals[0].discount_percent, 80)
         self.assertTrue(deals[0].is_super_steal)
-        self.assertIn("m=A215JX4S9CANQK", deals[0].url)
+        self.assertIn("smid=A215JX4S9CANSO", deals[0].url)
 
         with tempfile.TemporaryDirectory() as tmp:
             st = PriceStorage(Path(tmp) / "depo.db")

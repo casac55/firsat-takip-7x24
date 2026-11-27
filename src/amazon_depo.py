@@ -16,11 +16,12 @@ from src.scrapers.structured import extract_json_ld_products
 
 logger = logging.getLogger(__name__)
 
-AMAZON_DEPO_MERCHANT_ID = "A215JX4S9CANQK"
+AMAZON_DEPO_MERCHANT_ID = "A215JX4S9CANSO"
 
 DEPO_CATEGORY_FEEDS: dict[str, tuple[str, str]] = {
     "tumu": ("Tüm Amazon Depo (En Yeni)", "https://www.amazon.com.tr/s?i=warehouse-deals&s=date-desc-rank"),
-    "populer": ("Amazon Depo (Çok Satanlar)", "https://www.amazon.com.tr/s?i=warehouse-deals&s=review-rank"),
+    "populer": ("Amazon Depo (Öne Çıkanlar)", "https://www.amazon.com.tr/s?i=warehouse-deals&s=exact-aware-popularity-rank"),
+    "yildizli": ("Amazon Depo (Çok Değerlendirilen)", "https://www.amazon.com.tr/s?i=warehouse-deals&s=review-rank"),
     "elektronik": ("Elektronik", "https://www.amazon.com.tr/s?i=warehouse-deals&rh=n%3A12466496031&s=date-desc-rank"),
     "bilgisayar": ("Bilgisayar & Bileşen", "https://www.amazon.com.tr/s?i=warehouse-deals&rh=n%3A12466439031&s=date-desc-rank"),
     "ev_mutfak": ("Ev & Mutfak", "https://www.amazon.com.tr/s?i=warehouse-deals&rh=n%3A12466553031&s=date-desc-rank"),
@@ -159,7 +160,7 @@ class AmazonDepoHunter:
                     savings_tl=savings,
                     condition_label=item["condition_label"],
                     category=item["category"],
-                    url=f"https://www.amazon.com.tr/dp/{item['asin']}?m={AMAZON_DEPO_MERCHANT_ID}&th=1",
+                    url=f"https://www.amazon.com.tr/dp/{item['asin']}?smid={AMAZON_DEPO_MERCHANT_ID}&th=1",
                     image_url=item["image_url"],
                     price_source=p_src,
                     is_super_steal=(disc_pct >= super_discount_percent),
@@ -185,7 +186,7 @@ class AmazonDepoHunter:
             if "Prime Video" in card_txt or "Bölüm" in card_txt and "TL" not in card_txt:
                 continue
 
-            # 1) İkinci el / Depo teklif fiyatı (secondary-offer-recipe)
+            # 1) İkinci el / Depo teklif fiyatı (secondary-offer-recipe) ve gerçek stok kontrolü
             sec_el = card.select_one("div[data-cy='secondary-offer-recipe']")
             sec_txt = sec_el.get_text(" ", strip=True) if sec_el else ""
             sec_price: Optional[float] = None
@@ -193,6 +194,18 @@ class AmazonDepoHunter:
                 m_sec = _SECONDARY_PRICE_RE.search(sec_txt)
                 if m_sec:
                     sec_price = parse_price_tl(m_sec.group(1))
+
+            card_hrefs = " ".join(str(a.get("href") or "") for a in card.select("a[href]"))
+            has_live_depo_stock = bool(
+                sec_price
+                or "ikinci el" in sec_txt.lower()
+                or "ikinci el" in card_txt.lower()
+                or "amazon depo" in card_txt.lower()
+                or AMAZON_DEPO_MERCHANT_ID in card_hrefs
+            )
+            # Depo stoğu tükenmiş önbellek kartlarını (yalnızca sıfır satıcı kalanları) ele!
+            if not has_live_depo_stock:
+                continue
 
             # 2) Karttaki ana fiyat ve üstü çizili / yeni fiyat
             main_price: Optional[float] = None
