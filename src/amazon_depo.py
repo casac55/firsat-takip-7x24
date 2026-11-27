@@ -7,7 +7,7 @@ import statistics
 import time
 from dataclasses import dataclass
 from typing import Optional
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote, quote_plus, unquote
 
 from bs4 import BeautifulSoup
 
@@ -65,9 +65,10 @@ def build_depo_cart_url(asin: str, offer_listing_id: str = "", associate_tag: st
     """
     tag_q = f"&AssociateTag={quote(associate_tag)}" if associate_tag else ""
     if offer_listing_id:
+        clean_oid = quote(unquote(offer_listing_id), safe="")
         return (
             f"https://www.amazon.com.tr/gp/aws/cart/add.html"
-            f"?OfferListingId.1={quote(offer_listing_id)}&Quantity.1=1{tag_q}"
+            f"?OfferListingId.1={clean_oid}&Quantity.1=1{tag_q}"
         )
     tag_dp = f"&tag={quote(associate_tag)}" if associate_tag else ""
     return f"https://www.amazon.com.tr/dp/{asin}?smid={AMAZON_DEPO_MERCHANT_ID}&th=1{tag_dp}"
