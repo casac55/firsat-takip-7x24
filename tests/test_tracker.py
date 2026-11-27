@@ -1192,6 +1192,7 @@ database:
             self.assertIn("JBL GO4 Bluetooth Hoparlör", html_out)
             self.assertIn("-%80", html_out)
             self.assertIn("aod=1&amp;smid=A215JX4S9CANSO", html_out)
+            self.assertIn("amazon-depo-fast.user.js", html_out)
             removed = st.prune_stale_depo_deals({"B0NEWASIN1"})
             self.assertEqual(removed, 1)
             self.assertEqual(len(st.list_depo_deals()), 0)

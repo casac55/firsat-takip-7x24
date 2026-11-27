@@ -128,6 +128,16 @@ def start_dashboard_server(
                 self.wfile.write(login_bytes)
                 return
 
+            if parsed.path == "/amazon-depo-fast.user.js":
+                js_bytes = _build_amazon_depo_userscript().encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/javascript; charset=utf-8")
+                self.send_header("Content-Disposition", 'inline; filename="amazon-depo-fast.user.js"')
+                self.send_header("Content-Length", str(len(js_bytes)))
+                self.end_headers()
+                self.wfile.write(js_bytes)
+                return
+
             if parsed.path == "/export.csv":
                 data = generate_csv_report_bytes(storage)
                 self.send_response(200)
@@ -502,6 +512,84 @@ def start_dashboard_server(
         return None
 
 
+def _build_amazon_depo_userscript() -> str:
+    return """// ==UserScript==
+// @name         Amazon.com.tr Depo Hizli Odeme Gecisi
+// @namespace    amazon-depo-sniper
+// @version      1.0
+// @description  #ft_buy=1 ile acilan Amazon Depo urununu sepete ekler ve Alisverisi Tamamla'ya tiklayip odeme ekraninda durur.
+// @match        https://www.amazon.com.tr/*
+// @grant        none
+// ==/UserScript==
+
+(function () {
+  'use strict';
+
+  if (location.hash.includes('ft_buy=1')) {
+    sessionStorage.setItem('ft_buy_active', '1');
+    sessionStorage.setItem('ft_buy_ts', String(Date.now()));
+  }
+
+  const isActive = sessionStorage.getItem('ft_buy_active') === '1';
+  const startedAt = Number(sessionStorage.getItem('ft_buy_ts') || '0');
+  if (!isActive || (Date.now() - startedAt > 45000)) {
+    sessionStorage.removeItem('ft_buy_active');
+    return;
+  }
+
+  // Odeme ekranina veya giris/guvenlik ekranina ulasinca hemen dur (kontrol kullanicida)
+  if (location.pathname.includes('/gp/buy/') || location.pathname.includes('/checkout') || location.pathname.includes('/ap/signin')) {
+    sessionStorage.removeItem('ft_buy_active');
+    return;
+  }
+
+  let stepDone = false;
+  const timer = setInterval(() => {
+    if (stepDone) return;
+
+    // 1) Sepet / SmartWagon ekranindaysak -> Alisverisi Tamamla butonuna bas
+    const ptc = document.querySelector(
+      'input[name="proceedToRetailCheckout"], #sc-buy-box-ptc-button input, #attach-sidesheet-checkout-button input, [data-feature-id="proceed-to-checkout-action"]'
+    );
+    if (ptc && ptc.offsetParent !== null) {
+      stepDone = true;
+      clearInterval(timer);
+      ptc.click();
+      return;
+    }
+
+    // 2) AOD cekmecesi aciksa -> "Amazon Depo" saticisinin Sepete Ekle butonuna bas
+    const offers = document.querySelectorAll('#aod-pinned-offer, #aod-offer');
+    for (const off of offers) {
+      const soldEl = off.querySelector('#aod-offer-soldBy');
+      const soldTxt = (soldEl ? soldEl.textContent : '').toLowerCase();
+      if (soldTxt.includes('amazon depo')) {
+        const atc = off.querySelector('[data-aod-atc-action] input[type="submit"], [data-aod-atc-action] button, input[name="submit.addToCart"], .aod-atc-btn input');
+        if (atc) {
+          stepDone = true;
+          setTimeout(() => { stepDone = false; }, 2200);
+          atc.click();
+          return;
+        }
+      }
+    }
+
+    // 3) Ana sayfa BuyBox zaten Amazon Depo ise -> direkt Sepete Ekle
+    const merchEl = document.querySelector('#merchant-info, #sellerProfileTriggerId');
+    const merchTxt = (merchEl ? merchEl.textContent : '').toLowerCase();
+    if (merchTxt.includes('amazon depo')) {
+      const mainAtc = document.querySelector('#add-to-cart-button');
+      if (mainAtc) {
+        stepDone = true;
+        setTimeout(() => { stepDone = false; }, 2200);
+        mainAtc.click();
+      }
+    }
+  }, 350);
+})();
+"""
+
+
 def _mask_secret(val: str) -> str:
     if not val:
         return ""
@@ -855,6 +943,19 @@ def _render_dashboard_html(
         <h3>📂 Taranacak Mağaza Kaynakları / Amazon Depo Kategorileri</h3>
         <div class="cats-grid">{''.join(cat_boxes)}</div>
         <button class="btn btn-green" onclick="saveDepoSettings()">💾 Tüm Radar Ayarlarını Kaydet</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>⚡ Doğrudan Ödeme Ekranına Geçiş (Sepete Ekle → Alışverişi Tamamla)</h2>
+          <a class="btn btn-orange btn-sm" href="/amazon-depo-fast.user.js" target="_blank">⬇️ Hızlı Geçiş Betiğini Yükle (.user.js)</a>
+        </div>
+        <p class="muted" style="line-height:1.5">
+          Amazon hesabınızın şifresini paylaşmadan, kendi açık tarayıcınızda <b>"Sepete Ekle → Alışverişi Tamamla"</b> adımlarını otomatik geçip sizi doğrudan <b>Ödeme Ekranına</b> ulaştırır (son satın alma onayına asla basmaz):
+          <br/>• <b>Bilgisayar (Chrome/Edge):</b> <b>Tampermonkey</b> eklentisini kurup yukarıdaki turuncu butona tıklayın ve "Kur" deyin.
+          <br/>• <b>iPhone (Safari):</b> App Store'dan ücretsiz <b>Userscripts</b> uygulamasını açıp betiği ekleyin.
+          <br/>• Kurulumdan sonra panelden veya Telegram'dan <b>⚡ Depo Teklifini Aç &amp; Al</b> linkine bastığınızda otomatik olarak ödeme ekranına geçersiniz!
+        </p>
       </div>
     </div>
 
