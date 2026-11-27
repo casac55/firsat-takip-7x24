@@ -959,6 +959,7 @@ def _render_dashboard_html(
           <br/>2. Chrome sağ üstte <b>Tampermonkey → Yeni betik oluştur...</b> açın, içindekini silip (<code>Ctrl+A</code> → <code>Delete</code>) yapıştırın (<code>Ctrl+V</code>) ve kaydedin (<code>Ctrl+S</code>).
           <br/>3. <i>(iPhone Safari'de ücretsiz <b>Userscripts</b> uygulamasına yapıştırıp Save deyin.)</i>
         </p>
+        <textarea id="us_box" readonly rows="5" style="display:none;font-family:monospace;font-size:12px"></textarea>
       </div>
     </div>
 
@@ -1147,8 +1148,21 @@ def _render_dashboard_html(
       try {{
         const r = await fetch('/amazon-depo-fast.user.js');
         const txt = await r.text();
-        await navigator.clipboard.writeText(txt);
-        toast('✅ Betik kodu panoya kopyalandı! Şimdi Tampermonkey -> Yeni betik oluştur -> Ctrl+A -> Ctrl+V -> Ctrl+S yapın.', true);
+        const box = document.getElementById('us_box');
+        if (box) {{
+          box.value = txt;
+          box.style.display = 'block';
+          box.focus();
+          box.select();
+        }}
+        let copied = false;
+        if (navigator.clipboard && navigator.clipboard.writeText) {{
+          try {{ await navigator.clipboard.writeText(txt); copied = true; }} catch (_) {{}}
+        }}
+        if (!copied) {{
+          copied = document.execCommand('copy');
+        }}
+        toast(copied ? '✅ Betik kodu panoya kopyalandı! Tampermonkey -> Yeni betik oluştur -> Ctrl+A -> Ctrl+V -> Ctrl+S' : 'Kod aşağıda seçildi, Ctrl+C ile kopyalayın.', true);
       }} catch (e) {{
         toast('Kopyalama hatası: ' + e, false);
       }}
