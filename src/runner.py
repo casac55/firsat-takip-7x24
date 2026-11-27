@@ -157,11 +157,11 @@ class PriceTrackerRunner:
             ) and due_slot:
                 self.storage.mark_daily_report_sent(due_slot)
 
-        # Katman 1 (Her döngüde: 2-3 dk): Özel takip edilen ürün linkleri, kelime aramaları, topluluk kuponları ve Amazon Depo (%70-%90 düşüş radarı)
+        # Katman 1 (Her döngüde: 2-3 dk): Özel takip edilen ürün linkleri, kelime aramaları ve topluluk kuponları
+        # (Amazon Depo kendi bağımsız 30 sn'lik hızlı arka plan thread'inde çalışır)
         self._check_watched_urls()
         self._check_watched_keywords()
         self._check_community_deals()
-        self.scan_amazon_depo(force=False)
 
         # Katman 2 (10 dakikada bir): Çok satanlar (%60+ fiyat hatası avcısı dahil) ve popüler fırsatlar
         now_ts = time.time()

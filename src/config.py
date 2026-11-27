@@ -103,6 +103,7 @@ class AppConfig:
     bestseller_min_drop_percent: float = 4.0
     bestseller_min_drop_tl: float = 50.0
     depo_enabled: bool = True
+    depo_interval_seconds: int = 30
     depo_min_discount_percent: int = 35
     depo_super_discount_percent: int = 75
     depo_min_price_tl: float = 100.0
@@ -274,6 +275,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         bestseller_min_drop_percent=float((data.get("bestseller_tracker") or {}).get("min_drop_percent", 25.0)),
         bestseller_min_drop_tl=float((data.get("bestseller_tracker") or {}).get("min_drop_tl", 100.0)),
         depo_enabled=bool((data.get("amazon_depo") or {}).get("enabled", True)),
+        depo_interval_seconds=max(15, int((data.get("amazon_depo") or {}).get("interval_seconds", 30))),
         depo_min_discount_percent=max(5, int((data.get("amazon_depo") or {}).get("min_discount_percent", 35))),
         depo_super_discount_percent=max(20, int((data.get("amazon_depo") or {}).get("super_discount_percent", 75))),
         depo_min_price_tl=max(0.0, float((data.get("amazon_depo") or {}).get("min_price_tl", 100.0))),

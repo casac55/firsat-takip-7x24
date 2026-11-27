@@ -359,6 +359,7 @@ def start_dashboard_server(
 
                 if path == "/api/depo/settings":
                     config.depo_enabled = bool(data.get("depo_enabled", config.depo_enabled))
+                    config.depo_interval_seconds = max(15, int(data.get("depo_interval_seconds", config.depo_interval_seconds)))
                     config.depo_min_discount_percent = max(5, int(data.get("depo_min_discount_percent", config.depo_min_discount_percent)))
                     config.depo_super_discount_percent = max(20, int(data.get("depo_super_discount_percent", config.depo_super_discount_percent)))
                     config.depo_min_price_tl = max(0.0, float(data.get("depo_min_price_tl", config.depo_min_price_tl)))
@@ -375,6 +376,7 @@ def start_dashboard_server(
 
                     dp_sec = config.raw_yaml.setdefault("amazon_depo", {})
                     dp_sec["enabled"] = config.depo_enabled
+                    dp_sec["interval_seconds"] = config.depo_interval_seconds
                     dp_sec["min_discount_percent"] = config.depo_min_discount_percent
                     dp_sec["super_discount_percent"] = config.depo_super_discount_percent
                     dp_sec["min_price_tl"] = int(config.depo_min_price_tl)
@@ -1842,10 +1844,11 @@ def _render_dashboard_html(
 
     <div class="card">
       <div class="card-head"><h2>⚙️ Amazon Depo Odak, Kategori, Kelime &amp; %80–%90 Acil Alarm Ayarları</h2></div>
-      <label class="chk"><input type="checkbox" id="dp_en" {'checked' if config.depo_enabled else ''} /> <b>7/24 Otomatik Amazon Depo Taraması Aktif</b> (Her 2-3 dakikada bir yeni düşenleri yakalar)</label>
+      <label class="chk"><input type="checkbox" id="dp_en" {'checked' if config.depo_enabled else ''} /> <b>7/24 Bağımsız Yüksek Hızlı Amazon Depo Radarı Aktif</b> (Her {config.depo_interval_seconds} saniyede bir yeni düşenleri yakalar)</label>
       <label class="chk"><input type="checkbox" id="dp_admin" {'checked' if config.depo_auto_notify_admin else ''} /> Süper Düşüş Eşiğinde (örn. %75–%90) <b>Kişisel Telegram'ıma Anında Acil Alarm Gönder</b></label>
       <label class="chk"><input type="checkbox" id="dp_ch" {'checked' if config.depo_auto_publish_channel else ''} /> Süper Düşüşleri Fotoğraflı Olarak <b>{html.escape(config.telegram_channel_id)} Kanalına Otomatik Yayınla</b></label>
       <div class="row2">
+        <div><label>⚡ Tarama Sıklığı (Saniye, min 15 sn)</label><input id="dp_sec" type="number" min="15" value="{config.depo_interval_seconds}" /></div>
         <div><label>Listeleme Min. İndirim (%)</label><input id="dp_minpct" type="number" value="{config.depo_min_discount_percent}" /></div>
         <div><label>🚨 Acil Alarm Süper İndirim Eşiği (%)</label><input id="dp_superpct" type="number" value="{config.depo_super_discount_percent}" /></div>
         <div><label>Min. Ürün Fiyatı (TL)</label><input id="dp_minp" type="number" value="{int(config.depo_min_price_tl)}" /></div>
@@ -2382,6 +2385,7 @@ sudo apt-get update && sudo apt-get install -y unzip && mkdir -p ~/firsat-takip 
       document.querySelectorAll('.depo-cat-chk:checked').forEach(el => cats.push(el.dataset.cat));
       api('/api/depo/settings', {{
         depo_enabled: chk('dp_en'),
+        depo_interval_seconds: Number(val('dp_sec')),
         depo_auto_notify_admin: chk('dp_admin'),
         depo_auto_publish_channel: chk('dp_ch'),
         depo_min_discount_percent: Number(val('dp_minpct')),

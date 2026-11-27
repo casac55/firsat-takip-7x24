@@ -126,11 +126,32 @@ def main() -> int:
         logger.warning("Telegram ayarlanmamış! Sadece konsol ve SQLite veritabanına kayıt yapılacak.")
 
     logger.info(
-        "Daemon başlatıldı: normal %d dk, kampanya saatlerinde (%s) Turbo %d dk aralıkla kontrol edilecek.",
+        "Daemon başlatıldı: normal %d dk, kampanya saatlerinde (%s) Turbo %d dk aralıkla kontrol edilecek. "
+        "Amazon Depo bağımsız hızlı tarayıcı: %d sn.",
         config.interval_minutes,
         ", ".join(config.turbo_windows),
         config.turbo_interval_minutes,
+        config.depo_interval_seconds,
     )
+
+    # Amazon Depo için ana taramadan bağımsız yüksek hızlı arka plan döngüsü (varsayılan 30 sn)
+    depo_stop = threading.Event()
+
+    def _depo_sniper_loop() -> None:
+        while not depo_stop.is_set():
+            try:
+                if config.depo_enabled and not config.daemon_paused:
+                    runner.scan_amazon_depo(force=False)
+            except Exception as exc:
+                logger.debug("Amazon Depo hızlı döngü hatası: %s", exc)
+            wait_s = max(15, int(getattr(config, "depo_interval_seconds", 30)))
+            for _ in range(wait_s):
+                if depo_stop.is_set():
+                    break
+                time.sleep(1)
+
+    threading.Thread(target=_depo_sniper_loop, daemon=True, name="amazon-depo-sniper").start()
+
     try:
         while True:
             if not config.daemon_paused:
