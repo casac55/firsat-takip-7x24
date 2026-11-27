@@ -516,8 +516,8 @@ def _build_amazon_depo_userscript() -> str:
     return """// ==UserScript==
 // @name         Amazon.com.tr Depo Hizli Odeme Gecisi
 // @namespace    amazon-depo-sniper
-// @version      1.1
-// @description  ft_buy=1 ile acilan Amazon Depo urununu sepete ekler ve Alisverisi Tamamla'ya tiklayip odeme ekraninda durur.
+// @version      1.2
+// @description  ft_buy=1 ile acilan Amazon Depo urununu sepete ekler, Alisverisi Tamamla'ya tiklar ve odeme ekraninda durur.
 // @match        https://www.amazon.com.tr/*
 // @grant        none
 // ==/UserScript==
@@ -532,7 +532,7 @@ def _build_amazon_depo_userscript() -> str:
 
   const isActive = sessionStorage.getItem('ft_buy_active') === '1';
   const startedAt = Number(sessionStorage.getItem('ft_buy_ts') || '0');
-  if (!isActive || (Date.now() - startedAt > 45000)) {
+  if (!isActive || (Date.now() - startedAt > 60000)) {
     sessionStorage.removeItem('ft_buy_active');
     return;
   }
@@ -543,22 +543,56 @@ def _build_amazon_depo_userscript() -> str:
     return;
   }
 
-  let stepDone = false;
+  function isVis(el) {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    const st = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none';
+  }
+
+  function showPill(msg) {
+    let p = document.getElementById('ft-sniper-pill');
+    if (!p && document.body) {
+      p = document.createElement('div');
+      p.id = 'ft-sniper-pill';
+      p.style.cssText = 'position:fixed;top:12px;left:12px;z-index:2147483647;background:#16a34a;color:#fff;padding:8px 14px;border-radius:10px;font:700 13px system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+      document.body.appendChild(p);
+    }
+    if (p) p.textContent = msg;
+  }
+
+  let lockUntil = 0;
+  let atcClickedAt = 0;
+
   const timer = setInterval(() => {
-    if (stepDone) return;
+    const now = Date.now();
+    if (now < lockUntil) return;
 
     // 1) Sepet / SmartWagon / SideSheet ekranindaysak -> Alisverisi Tamamla butonuna bas
     const ptc = document.querySelector(
-      'input[name="proceedToRetailCheckout"], #sc-buy-box-ptc-button input, #attach-sidesheet-checkout-button input, #aod-atc-checkout-btn input, [data-feature-id="proceed-to-checkout-action"]'
+      'input[name="proceedToRetailCheckout"], #sc-buy-box-ptc-button input, #attach-sidesheet-checkout-button input, #aod-atc-checkout-btn input, [data-feature-id="proceed-to-checkout-action"] input, [data-feature-id="proceed-to-checkout-action"]'
     );
-    if (ptc && ptc.offsetParent !== null) {
-      stepDone = true;
+    if (isVis(ptc)) {
+      showPill('⚡ Ödeme ekranına geçiliyor...');
       clearInterval(timer);
       ptc.click();
       return;
     }
 
-    // 2) AOD cekmecesi aciksa -> Sabitlenmis (pinned) veya liste icindeki Depo / Ikinci El teklifinin Sepete Ekle butonuna bas
+    // 2) Sepete eklendikten sonra "Sepete Git" ciktiysa veya sepet dolduysa -> /gp/cart/view.html'e gec
+    const bodyLow = (document.body ? document.body.textContent : '').toLowerCase();
+    const cartCntEl = document.querySelector('#nav-cart-count');
+    const cartCnt = cartCntEl ? parseInt(cartCntEl.textContent || '0', 10) : 0;
+    const goCart = document.querySelector('#sw-gtc a, #attach-sidesheet-view-cart-button input, a[href*="/gp/cart/view.html"]');
+    if (atcClickedAt > 0 && ((now - atcClickedAt > 900 && (bodyLow.includes('sepete eklendi') || cartCnt > 0)) || isVis(goCart))) {
+      showPill('⚡ Sepete gidiliyor -> Alışverişi Tamamla...');
+      lockUntil = now + 2500;
+      if (isVis(goCart)) goCart.click();
+      else location.href = 'https://www.amazon.com.tr/gp/cart/view.html';
+      return;
+    }
+
+    // 3) AOD cekmecesi aciksa -> "Amazon Depo" / "Ikinci El" teklifinin Sepete Ekle butonuna bas
     const offers = document.querySelectorAll('#aod-pinned-offer, #aod-offer');
     const fromDepoUrl = location.search.includes('A215JX4S9CANSO');
     for (const off of offers) {
@@ -567,23 +601,15 @@ def _build_amazon_depo_userscript() -> str:
       const soldTxt = (soldEl ? soldEl.textContent : '').toLowerCase();
       const isDepoMatch = soldTxt.includes('amazon depo') || (fromDepoUrl && (txt.includes('ikinci el') || txt.includes('yeni gibi') || txt.includes('çok iyi') || txt.includes('kabul edilebilir')));
       if (isDepoMatch) {
-        const atc = off.querySelector('[data-aod-atc-action] input[type="submit"], [data-aod-atc-action] button, input[name="submit.addToCart"], .aod-atc-btn input, input.a-button-input[type="submit"]');
-        if (atc && atc.offsetParent !== null) {
-          stepDone = true;
-          setTimeout(() => { stepDone = false; }, 2200);
+        const atc = off.querySelector('[data-aod-atc-action] input[type="submit"], [data-aod-atc-action] button, input[name="submit.addToCart"], .aod-atc-btn input, input.a-button-input');
+        if (isVis(atc) || (atc && isVis(atc.closest('.a-button')))) {
+          showPill('⚡ Amazon Depo Sepete Ekleniyor...');
+          atcClickedAt = now;
+          lockUntil = now + 1800;
           atc.click();
           return;
         }
       }
-    }
-
-    // 3) AOD sepete eklendikten sonra "Sepete Git" butonu cikarsa tikla (oradan Alisverisi Tamamla'ya gecer)
-    const goCart = document.querySelector('#sw-gtc a, #attach-sidesheet-view-cart-button input, a[href*="/gp/cart/view.html"], a[href*="/cart?ref"]');
-    if (goCart && goCart.offsetParent !== null && document.body.textContent.toLowerCase().includes('sepete eklendi')) {
-      stepDone = true;
-      setTimeout(() => { stepDone = false; }, 2200);
-      goCart.click();
-      return;
     }
 
     // 4) Ana sayfa BuyBox zaten Amazon Depo ise -> direkt Sepete Ekle
@@ -591,13 +617,14 @@ def _build_amazon_depo_userscript() -> str:
     const merchTxt = (merchEl ? merchEl.textContent : '').toLowerCase();
     if (merchTxt.includes('amazon depo')) {
       const mainAtc = document.querySelector('#add-to-cart-button');
-      if (mainAtc) {
-        stepDone = true;
-        setTimeout(() => { stepDone = false; }, 2200);
+      if (isVis(mainAtc)) {
+        showPill('⚡ Depo BuyBox Sepete Ekleniyor...');
+        atcClickedAt = now;
+        lockUntil = now + 1800;
         mainAtc.click();
       }
     }
-  }, 300);
+  }, 250);
 })();
 """
 

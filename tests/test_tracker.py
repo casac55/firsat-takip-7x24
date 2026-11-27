@@ -1193,6 +1193,12 @@ database:
             self.assertIn("-%80", html_out)
             self.assertIn("aod=1&amp;smid=A215JX4S9CANSO", html_out)
             self.assertIn("amazon-depo-fast.user.js", html_out)
+            from src.tg_radar import extract_amazon_asins_from_text
+
+            asins = extract_amazon_asins_from_text(
+                "🔥 Karcher K4 Depo Düştü! https://www.amazon.com.tr/dp/B0D92CF1P5?smid=A215JX4S9CANSO"
+            )
+            self.assertEqual(asins, ["B0D92CF1P5"])
             removed = st.prune_stale_depo_deals({"B0NEWASIN1"})
             self.assertEqual(removed, 1)
             self.assertEqual(len(st.list_depo_deals()), 0)

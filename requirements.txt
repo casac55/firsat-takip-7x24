@@ -6,6 +6,7 @@ python-dotenv>=1.0.0
 curl-cffi>=0.7.0
 pillow>=10.0.0
 tweepy>=4.14.0
+telethon>=1.36.0
 pytest>=8.0.0
 # Opsiyonel (JS korumalı siteler için tarayıcı fallback):
 # playwright>=1.45.0

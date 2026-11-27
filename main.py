@@ -12,6 +12,7 @@ from src.dashboard import start_dashboard_server
 from src.depo_runner import AmazonDepoRunner
 from src.notifier import TelegramNotifier
 from src.storage import PriceStorage
+from src.tg_radar import TelegramLiveRadar
 from src.wakeup import WakeupAlarmManager
 
 
@@ -93,6 +94,7 @@ def main() -> int:
         config.depo_interval_seconds,
         config.depo_super_discount_percent,
     )
+    TelegramLiveRadar(config, depo_runner).start_background()
 
     try:
         while True:
