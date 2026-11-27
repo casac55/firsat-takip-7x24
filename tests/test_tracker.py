@@ -1177,7 +1177,7 @@ database:
         self.assertEqual(deals[0].offer_listing_id, "YS9ssVumaFVfEncryptedDepoOID123==")
         self.assertTrue(deals[0].is_super_steal)
         self.assertIn("smid=A215JX4S9CANSO", deals[0].url)
-        self.assertIn("OfferListingId.1=YS9ssVumaFVfEncryptedDepoOID123", deals[0].cart_url())
+        self.assertIn("aod=1&smid=A215JX4S9CANSO", deals[0].cart_url())
 
         with tempfile.TemporaryDirectory() as tmp:
             st = PriceStorage(Path(tmp) / "depo.db")
@@ -1191,7 +1191,7 @@ database:
             self.assertIn("Amazon Depo Özel Radarı", html_out)
             self.assertIn("JBL GO4 Bluetooth Hoparlör", html_out)
             self.assertIn("-%80", html_out)
-            self.assertIn("OfferListingId.1=YS9ssVumaFVfEncryptedDepoOID123", html_out)
+            self.assertIn("aod=1&amp;smid=A215JX4S9CANSO", html_out)
             removed = st.prune_stale_depo_deals({"B0NEWASIN1"})
             self.assertEqual(removed, 1)
             self.assertEqual(len(st.list_depo_deals()), 0)

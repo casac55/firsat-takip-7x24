@@ -60,18 +60,13 @@ def extract_asin(text_or_url: str) -> str:
 
 def build_depo_cart_url(asin: str, offer_listing_id: str = "", associate_tag: str = "") -> str:
     """
-    Şifreli OfferListingId varsa DOĞRUDAN o ucuz Amazon Depo (İkinci El) adetini sepete ekleyen
-    resmi Amazon linkini üretir; yoksa doğrudan Amazon Depo satıcılı ürün sayfasına yönlendirir.
+    Amazon.com.tr'de oturum bağımsız en hızlı ve hatasız Depo alım linkini üretir.
+    Not: gp/aws/cart/add.html oturumsuz çekilen OfferListingId ile kullanıcı tarayıcısında
+    boş sepet verebildiği için, doğrudan Depo çekmecesini (aod=1) ve satıcıyı (smid)
+    açan kesin bağlantıyı kullanır.
     """
-    tag_q = f"&AssociateTag={quote(associate_tag)}" if associate_tag else ""
-    if offer_listing_id:
-        clean_oid = quote(unquote(offer_listing_id), safe="")
-        return (
-            f"https://www.amazon.com.tr/gp/aws/cart/add.html"
-            f"?OfferListingId.1={clean_oid}&Quantity.1=1{tag_q}"
-        )
     tag_dp = f"&tag={quote(associate_tag)}" if associate_tag else ""
-    return f"https://www.amazon.com.tr/dp/{asin}?smid={AMAZON_DEPO_MERCHANT_ID}&th=1{tag_dp}"
+    return f"https://www.amazon.com.tr/dp/{asin}?aod=1&smid={AMAZON_DEPO_MERCHANT_ID}&th=1{tag_dp}"
 
 
 @dataclass(slots=True)
@@ -138,7 +133,7 @@ class AmazonDepoHunter:
             html = self.fetcher.get_text(aod_url)
         except Exception as exc:
             logger.debug("AOD okunamadı (%s): %s", clean_asin, exc)
-            return None
+            raise RuntimeError(f"AOD_FETCH_ERR:{exc}") from exc
 
         soup = BeautifulSoup(html, "lxml")
         t_el = soup.select_one("#aod-asin-title-text")
@@ -312,13 +307,16 @@ class AmazonDepoHunter:
             w_asin = extract_asin(str(w.get("asin") or ""))
             if not w_asin:
                 continue
-            deal = self.inspect_asin_aod(
-                w_asin,
-                category_hint="🎯 Özel Nöbet",
-                fallback_title=str(w.get("note") or ""),
-                super_discount_percent=super_discount_percent,
-                is_watchlist=True,
-            )
+            try:
+                deal = self.inspect_asin_aod(
+                    w_asin,
+                    category_hint="🎯 Özel Nöbet",
+                    fallback_title=str(w.get("note") or ""),
+                    super_discount_percent=super_discount_percent,
+                    is_watchlist=True,
+                )
+            except Exception:
+                continue
             if deal is None:
                 sold_out_asins.add(w_asin)
                 continue
@@ -341,11 +339,14 @@ class AmazonDepoHunter:
                 for p_asin, p_cat in slice_pool:
                     if p_asin in found_by_asin:
                         continue
-                    deal = self.inspect_asin_aod(
-                        p_asin,
-                        category_hint=p_cat,
-                        super_discount_percent=super_discount_percent,
-                    )
+                    try:
+                        deal = self.inspect_asin_aod(
+                            p_asin,
+                            category_hint=p_cat,
+                            super_discount_percent=super_discount_percent,
+                        )
+                    except Exception:
+                        continue
                     if deal and min_price_tl <= deal.depo_price_tl <= max_price_tl and deal.discount_percent >= min_discount_percent:
                         found_by_asin[deal.asin] = deal
                     time.sleep(0.35)
@@ -402,13 +403,16 @@ class AmazonDepoHunter:
             if asin in found_by_asin:
                 continue
             # Her adayı AOD üzerinden doğrula: hem sahte/bitmiş önbelleği eler hem de gerçek OfferListingId (oid) alır!
-            aod_deal = self.inspect_asin_aod(
-                asin,
-                category_hint=item["category"],
-                fallback_title=item["title"],
-                fallback_image=item["image_url"],
-                super_discount_percent=super_discount_percent,
-            )
+            try:
+                aod_deal = self.inspect_asin_aod(
+                    asin,
+                    category_hint=item["category"],
+                    fallback_title=item["title"],
+                    fallback_image=item["image_url"],
+                    super_discount_percent=super_discount_percent,
+                )
+            except Exception:
+                continue
             time.sleep(0.35)
             if aod_deal is None:
                 sold_out_asins.add(asin)
@@ -439,13 +443,17 @@ class AmazonDepoHunter:
             asin = str(row.get("asin") or "").strip().upper()
             if not asin:
                 continue
-            deal = self.inspect_asin_aod(
-                asin,
-                category_hint=str(row.get("category") or "Amazon Depo"),
-                fallback_title=str(row.get("title") or ""),
-                fallback_image=str(row.get("image_url") or ""),
-                super_discount_percent=super_discount_percent,
-            )
+            try:
+                deal = self.inspect_asin_aod(
+                    asin,
+                    category_hint=str(row.get("category") or "Amazon Depo"),
+                    fallback_title=str(row.get("title") or ""),
+                    fallback_image=str(row.get("image_url") or ""),
+                    super_discount_percent=super_discount_percent,
+                )
+            except Exception:
+                # 503 veya ağ hatasında ürünü tükenmiş sanıp silme!
+                continue
             if deal is None:
                 gone_asins.add(asin)
             else:

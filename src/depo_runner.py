@@ -41,6 +41,7 @@ class AmazonDepoRunner:
         self.hunter = AmazonDepoHunter(self.fetcher)
         self.channel_publisher = ChannelPublisher(config, storage, notifier)
         self._cycle_count = 0
+        self.last_cycle_ts = ""
 
     def run_cycle(self, force: bool = False) -> dict:
         if not force and not self.config.depo_enabled:
@@ -103,6 +104,9 @@ class AmazonDepoRunner:
             if self.config.depo_auto_publish_channel and self.channel_publisher.is_enabled:
                 self.publish_depo_to_channel(d)
 
+        from datetime import datetime
+
+        self.last_cycle_ts = datetime.now().isoformat(timespec="seconds")
         top_pct = deals[0].discount_percent if deals else 0
         logger.info(
             "[Amazon Depo Sniper] Döngü #%d tamamlandı: %d aktif fırsat, %d tükenen silindi, %d acil alarm (en yüksek: -%%%d).",
@@ -150,8 +154,8 @@ class AmazonDepoRunner:
         )
         kb = {
             "inline_keyboard": [
-                [{"text": "⚡ 1 TIKLA DEPO ADETİNİ SEPETE EKLE", "url": cart_url}],
-                [{"text": "🛒 Amazon Depo Teklifini Gör", "url": d.url}],
+                [{"text": "⚡ DEPO TEKLİFİNİ AÇ & SEPETE EKLE", "url": cart_url}],
+                [{"text": "🛒 Ürün Sayfasını Gör", "url": d.url}],
             ]
         }
 

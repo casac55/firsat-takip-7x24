@@ -160,7 +160,8 @@ def start_dashboard_server(
                 return
 
             if parsed.path == "/api/scan-status":
-                self._send_json(200, {**scan_state, "daemon_paused": config.daemon_paused})
+                last_c = getattr(runner, "last_cycle_ts", "") if runner else ""
+                self._send_json(200, {**scan_state, "daemon_paused": config.daemon_paused, "last_cycle_ts": last_c})
                 return
 
             if parsed.path == "/api/logs":
@@ -265,12 +266,16 @@ def start_dashboard_server(
                         self._send_json(400, {"ok": False, "msg": "Geçerli bir 10 haneli ASIN veya Amazon ürün linki girin."})
                         return
                     hunter = runner.hunter if (runner and hasattr(runner, "hunter")) else AmazonDepoHunter(runner.fetcher)
-                    deal = hunter.inspect_asin_aod(
-                        asin,
-                        category_hint="🔍 Anlık Sorgu",
-                        super_discount_percent=config.depo_super_discount_percent,
-                        is_watchlist=True,
-                    )
+                    try:
+                        deal = hunter.inspect_asin_aod(
+                            asin,
+                            category_hint="🔍 Anlık Sorgu",
+                            super_discount_percent=config.depo_super_discount_percent,
+                            is_watchlist=True,
+                        )
+                    except Exception as exc:
+                        self._send_json(200, {"ok": True, "in_depo": False, "asin": asin, "msg": f"⚠️ Amazon anlık yanıt vermedi (503), tekrar deneyin: {exc}"})
+                        return
                     if deal is None:
                         storage.remove_depo_asins({asin})
                         self._send_json(
@@ -623,8 +628,8 @@ def _render_dashboard_html(
             f"{note_html}"
             f"</div></div>"
             f"<div class='depo-btns'>"
-            f"<a class='btn btn-cart' href='{html.escape(cart_url, quote=True)}' target='_blank'>⚡ 1 Tıkla Sepete Ekle</a>"
-            f"<a class='btn btn-dark' href='{html.escape(str(dd.get('url') or '#'), quote=True)}' target='_blank'>🛒 Depo</a>"
+            f"<a class='btn btn-cart' href='{html.escape(cart_url, quote=True)}' target='_blank'>⚡ Depo Teklifini Aç &amp; Al</a>"
+            f"<a class='btn btn-dark' href='{html.escape(str(dd.get('url') or '#'), quote=True)}' target='_blank'>🛒 Sayfa</a>"
             f"<button class='btn btn-purple' onclick='publishDepo({asin_js})'>📢 Kanal</button>"
             f"<button class='btn btn-red-sm' onclick='deleteDepo({asin_js})'>🗑</button>"
             f"</div></div>"
@@ -1042,6 +1047,25 @@ def _render_dashboard_html(
         if (v) {{ v.textContent = j.logs || ''; v.scrollTop = v.scrollHeight; }}
       }} catch (e) {{}}
     }}
+
+    // Arka plan taraması tamamlandığında açık web panelini otomatik yenile (kullanıcı yazı yazmıyorsa)
+    let _knownCycleTs = null;
+    setInterval(async () => {{
+      try {{
+        const r = await fetch('/api/scan-status');
+        const s = await r.json();
+        if (!s.last_cycle_ts) return;
+        if (_knownCycleTs === null) {{
+          _knownCycleTs = s.last_cycle_ts;
+          return;
+        }}
+        if (s.last_cycle_ts !== _knownCycleTs && !s.running) {{
+          const activeEl = document.activeElement;
+          const isTyping = activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
+          if (!isTyping) location.reload();
+        }}
+      }} catch (e) {{}}
+    }}, 5000);
   </script>
 </body>
 </html>"""
